@@ -10,10 +10,14 @@ import {
 //      A paleta de cores vai se expandindo automaticamente
 // ═══════════════════════════════════════════════════════════════════
 const SQUADS_CONFIG = [
-  { nome: "Squad Pro Flora Be",  cor: "#6366f1" },
-  { nome: "Squad Pro Konjac",    cor: "#06b6d4" },
-  { nome: "Squad Pro Pibe",      cor: "#f43f5e" },
-  { nome: "Squad Pro Dark Lab",  cor: "#f59e0b" },
+  { nome: "Squad Max Titanium",  cor: "#ab0000" },
+  { nome: "Squad Nação Verde",  cor: "#00ad7f" },
+  { nome: "Squad Pibe",  cor: "#eddb64" },
+  { nome: "Squad Pro Comida de Dragão",  cor: "#04bf04" },
+  { nome: "Squad Pro Flora Be",  cor: "#e3028d" },
+  { nome: "Squad Pro Konjac",    cor: "#8b35bd" },
+  { nome: "Squad Pro Lummi",  cor: "#29ccb6" },
+  { nome: "Squad Pro So Delícia",  cor: "#d4cd02" },
   // ➕ Para adicionar um novo squad, copie a linha acima e ajuste nome e cor
 ];
 
