@@ -1,15 +1,25 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
-// ═══════════════════════════════════════════════════════════════════
-//  ✏️  CONFIGURAÇÃO DOS SQUADS — edite aqui para adicionar/remover
-//      Cada squad precisa de: nome e cor (hex)
-//      A paleta de cores vai se expandindo automaticamente
-// ═══════════════════════════════════════════════════════════════════
-const SQUADS_CONFIG = [
+const PALETA_SQUADS = [
+  "#ab0000",
+  "#00ad7f",
+  "#eddb64",
+  "#04bf04",
+  "#e3028d",
+  "#8b35bd",
+  "#29ccb6",
+  "#d4cd02",
+  "#2563eb",
+  "#f97316",
+  "#0891b2",
+  "#7c3aed",
+];
+
+const DADOS_EXEMPLO_SQUADS = [
   { nome: "Squad Max Titanium",  cor: "#ab0000" },
   { nome: "Squad Nação Verde",  cor: "#00ad7f" },
   { nome: "Squad Pibe",  cor: "#eddb64" },
@@ -18,16 +28,9 @@ const SQUADS_CONFIG = [
   { nome: "Squad Pro Konjac",    cor: "#8b35bd" },
   { nome: "Squad Pro Lummi",  cor: "#29ccb6" },
   { nome: "Squad Pro So Delícia",  cor: "#d4cd02" },
-  // ➕ Para adicionar um novo squad, copie a linha acima e ajuste nome e cor
 ];
 
-// ═══════════════════════════════════════════════════════════════════
-//  ✏️  DADOS HISTÓRICOS — substituir pela API/banco de dados
-//      Cada objeto é um mês. Coloque o nome do squad exatamente
-//      como está em SQUADS_CONFIG. Squads ausentes em um mês
-//      aparecem como zero automaticamente.
-// ═══════════════════════════════════════════════════════════════════
-const GMV_HISTORICO = [
+const DADOS_EXEMPLO_HISTORICO = [
   {
     mes: "Jan",
     "Squad Pro Flora Be": 142000,
@@ -73,6 +76,12 @@ const GMV_HISTORICO = [
 ];
 
 // ─── HELPERS ─────────────────────────────────────────────────────
+const withSquadColors = (squads) =>
+  squads.map((squad, index) => ({
+    ...squad,
+    cor: squad.cor || PALETA_SQUADS[index % PALETA_SQUADS.length],
+  }));
+
 const fmt = (v) =>
   v >= 1000000
     ? `R$ ${(v / 1000000).toFixed(1)}M`
@@ -139,11 +148,43 @@ function TooltipCustom({ active, payload, label }) {
 
 // ─── DASHBOARD ───────────────────────────────────────────────────
 export default function DashboardGMV() {
-  const [ativos, setAtivos]       = useState(new Set(SQUADS_CONFIG.map((s) => s.nome)));
+  const [dados, setDados]         = useState(DADOS_EXEMPLO_HISTORICO);
+  const [squads, setSquads]       = useState(DADOS_EXEMPLO_SQUADS);
+  const [status, setStatus]       = useState({ loading: true, error: null, updatedAt: null, rowCount: 0 });
+  const [ativos, setAtivos]       = useState(new Set(DADOS_EXEMPLO_SQUADS.map((s) => s.nome)));
   const [periodo, setPeriodo]     = useState(6);
 
-  const dadosFiltrados = GMV_HISTORICO.slice(-periodo);
-  const squadsAtivos   = SQUADS_CONFIG.filter((s) => ativos.has(s.nome));
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadData() {
+      try {
+        const response = await fetch("/api/gmv-historico");
+        if (!response.ok) throw new Error(`API ${response.status}`);
+        const payload = await response.json();
+
+        if (cancelled) return;
+
+        const nextDados = payload.historico?.length ? payload.historico : DADOS_EXEMPLO_HISTORICO;
+        const nextSquads = withSquadColors(payload.squads?.length ? payload.squads : DADOS_EXEMPLO_SQUADS);
+
+        setDados(nextDados);
+        setSquads(nextSquads);
+        setAtivos(new Set(nextSquads.map((s) => s.nome)));
+        setStatus({ loading: false, error: null, updatedAt: payload.updatedAt, rowCount: payload.rowCount || 0 });
+      } catch (error) {
+        if (!cancelled) {
+          setStatus({ loading: false, error: "Usando dados de exemplo enquanto a API não responde.", updatedAt: null, rowCount: 0 });
+        }
+      }
+    }
+
+    loadData();
+    return () => { cancelled = true; };
+  }, []);
+
+  const dadosFiltrados = useMemo(() => dados.slice(-periodo), [dados, periodo]);
+  const squadsAtivos   = squads.filter((s) => ativos.has(s.nome));
 
   const toggle = (nome) => {
     setAtivos((prev) => {
@@ -164,7 +205,7 @@ export default function DashboardGMV() {
             Dashboard GMV · Squads Pro
           </h1>
           <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 14 }}>
-            {SQUADS_CONFIG.length} squads ativos · dados de exemplo
+            {squads.length} squads ativos · {status.loading ? "carregando dados" : status.error ? status.error : `${status.rowCount} linhas processadas`}
           </p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -202,7 +243,7 @@ export default function DashboardGMV() {
 
       {/* FILTRO */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        {SQUADS_CONFIG.map((sq) => {
+        {squads.map((sq) => {
           const ativo = ativos.has(sq.nome);
           return (
             <button key={sq.nome} onClick={() => toggle(sq.nome)} style={{
@@ -266,7 +307,7 @@ export default function DashboardGMV() {
             </tr>
           </thead>
           <tbody>
-            {SQUADS_CONFIG.map((sq, i) => {
+            {squads.map((sq, i) => {
               const taxa     = calcTaxa(dadosFiltrados, sq.nome);
               const positivo = taxa !== null && parseFloat(taxa) >= 0;
               const inicial  = dadosFiltrados.find((d) => d[sq.nome] > 0)?.[sq.nome] || 0;
@@ -293,7 +334,7 @@ export default function DashboardGMV() {
       </div>
 
       <p style={{ marginTop: 24, textAlign: "center", color: "#d1d5db", fontSize: 12 }}>
-        V0 · dados de exemplo · conectar à API para produção
+        {status.updatedAt ? `Atualizado em ${new Date(status.updatedAt).toLocaleString("pt-BR")}` : "Dashboard GMV"}
       </p>
     </div>
   );

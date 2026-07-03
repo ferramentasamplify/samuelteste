@@ -32,55 +32,22 @@ npm run dev
 
 Abre em `http://localhost:5173`
 
-## Para conectar aos dados reais
+## Integração com dados reais
 
-Tudo que precisa ser alterado está no topo do arquivo
-`src/DashboardGMV.jsx`:
+O dashboard consome `GET /api/gmv-historico`.
 
-### 1. Lista de squads (`SQUADS_CONFIG`)
+Esse endpoint lê a Data Table `gmv_relatorios` do n8n, que é alimentada
+pelos arquivos Excel da pasta Dashboard GMV no Google Drive.
 
-```js
-const SQUADS_CONFIG = [
-  { nome: "Squad Pro Flora Be", cor: "#6366f1" },
-  { nome: "Squad Pro Konjac",   cor: "#06b6d4" },
-  // adicionar/remover squads aqui
-];
+Variáveis necessárias no Vercel:
+
+```bash
+N8N_API_KEY=<api-key do n8n>
+N8N_BASE_URL=https://n8n.amplifyugc.co
+N8N_GMV_TABLE_ID=PUk4cvXS0H2TSsrZ
 ```
 
-Como o número de squads varia mês a mês, esta lista pode ser
-substituída por uma chamada à API que retorne os squads ativos.
-
-### 2. Dados históricos (`GMV_HISTORICO`)
-
-```js
-const GMV_HISTORICO = [
-  {
-    mes: "Jan",
-    "Squad Pro Flora Be": 142000,
-    "Squad Pro Konjac": 98000,
-    // ...
-  },
-  // um objeto por mês
-];
-```
-
-Formato esperado de cada item: `{ mes: string, [nomeDoSquad]: number }`.
-Squads sem dado em um determinado mês podem ser omitidos — o
-dashboard trata isso como zero automaticamente.
-
-### 3. Sugestão de integração
-
-Substituir o array fixo por uma chamada de API, por exemplo:
-
-```js
-const [gmvHistorico, setGmvHistorico] = useState([]);
-
-useEffect(() => {
-  fetch("/api/gmv-historico")
-    .then((res) => res.json())
-    .then(setGmvHistorico);
-}, []);
-```
+Se a API não responder, o dashboard mantém dados de exemplo como fallback.
 
 ## Contato
 
