@@ -19,6 +19,16 @@ const formatSquadName = (value) => {
 
 const sortPeriod = (a, b) => String(a).localeCompare(String(b), "pt-BR");
 
+const parseJson = (value) => {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+};
+
 async function fetchAllRows({ baseUrl, apiKey, tableId }) {
   const rows = [];
   let cursor = null;
@@ -68,12 +78,38 @@ export default async function handler(request, response) {
     const rows = await fetchAllRows({ baseUrl, apiKey, tableId });
     const periods = new Map();
     const squads = new Map();
+    const columns = new Set([
+      "squad",
+      "periodo",
+      "criador",
+      "id_produto",
+      "nome_produto",
+      "gmv",
+      "arquivo_origem",
+      "data_processamento",
+    ]);
+    const detailRows = [];
 
     for (const row of rows) {
       const periodo = String(row.periodo || "").trim();
       const rawSquad = String(row.squad || "").trim();
       const squad = formatSquadName(rawSquad);
       const gmv = Number(row.gmv || 0);
+      const rawData = parseJson(row.dados);
+      const detail = {
+        ...rawData,
+        squad,
+        periodo,
+        criador: row.criador || rawData.criador || rawData.creator || rawData["@"] || "",
+        id_produto: row.id_produto || "",
+        nome_produto: row.nome_produto || "",
+        gmv,
+        arquivo_origem: row.arquivo_origem || "",
+        data_processamento: row.data_processamento || row.updatedAt || "",
+      };
+
+      Object.keys(detail).forEach((key) => columns.add(key));
+      detailRows.push(detail);
 
       if (!periodo || !squad || !Number.isFinite(gmv)) continue;
 
@@ -90,6 +126,8 @@ export default async function handler(request, response) {
         .sort(([a], [b]) => sortPeriod(a, b))
         .map(([, value]) => value),
       squads: [...squads.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+      linhas: detailRows,
+      colunas: [...columns],
       rowCount: rows.length,
       updatedAt: new Date().toISOString(),
     });

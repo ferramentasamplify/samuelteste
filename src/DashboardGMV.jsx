@@ -148,11 +148,14 @@ function TooltipCustom({ active, payload, label }) {
 
 // ─── DASHBOARD ───────────────────────────────────────────────────
 export default function DashboardGMV() {
-  const [dados, setDados]         = useState(DADOS_EXEMPLO_HISTORICO);
-  const [squads, setSquads]       = useState(DADOS_EXEMPLO_SQUADS);
+  const [dados, setDados]         = useState([]);
+  const [squads, setSquads]       = useState([]);
+  const [linhas, setLinhas]       = useState([]);
+  const [colunas, setColunas]     = useState([]);
   const [status, setStatus]       = useState({ loading: true, error: null, updatedAt: null, rowCount: 0 });
-  const [ativos, setAtivos]       = useState(new Set(DADOS_EXEMPLO_SQUADS.map((s) => s.nome)));
+  const [ativos, setAtivos]       = useState(new Set());
   const [periodo, setPeriodo]     = useState(6);
+  const [criadorFiltro, setCriadorFiltro] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -165,16 +168,23 @@ export default function DashboardGMV() {
 
         if (cancelled) return;
 
-        const nextDados = payload.historico?.length ? payload.historico : DADOS_EXEMPLO_HISTORICO;
-        const nextSquads = withSquadColors(payload.squads?.length ? payload.squads : DADOS_EXEMPLO_SQUADS);
+        const nextDados = payload.historico || [];
+        const nextSquads = withSquadColors(payload.squads || []);
 
         setDados(nextDados);
         setSquads(nextSquads);
+        setLinhas(payload.linhas || []);
+        setColunas(payload.colunas || []);
         setAtivos(new Set(nextSquads.map((s) => s.nome)));
         setStatus({ loading: false, error: null, updatedAt: payload.updatedAt, rowCount: payload.rowCount || 0 });
       } catch (error) {
         if (!cancelled) {
-          setStatus({ loading: false, error: "Usando dados de exemplo enquanto a API não responde.", updatedAt: null, rowCount: 0 });
+          setDados(DADOS_EXEMPLO_HISTORICO);
+          setSquads(DADOS_EXEMPLO_SQUADS);
+          setLinhas([]);
+          setColunas([]);
+          setAtivos(new Set(DADOS_EXEMPLO_SQUADS.map((s) => s.nome)));
+          setStatus({ loading: false, error: "API indisponível. Exibindo dados de exemplo.", updatedAt: null, rowCount: 0 });
         }
       }
     }
@@ -185,6 +195,11 @@ export default function DashboardGMV() {
 
   const dadosFiltrados = useMemo(() => dados.slice(-periodo), [dados, periodo]);
   const squadsAtivos   = squads.filter((s) => ativos.has(s.nome));
+  const linhasFiltradas = useMemo(() => {
+    const needle = criadorFiltro.trim().toLowerCase();
+    if (!needle) return linhas;
+    return linhas.filter((linha) => String(linha.criador || "").toLowerCase().includes(needle));
+  }, [linhas, criadorFiltro]);
 
   const toggle = (nome) => {
     setAtivos((prev) => {
@@ -223,6 +238,12 @@ export default function DashboardGMV() {
         </div>
       </div>
 
+      {!status.loading && !status.error && status.rowCount === 0 && (
+        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412", borderRadius: 12, padding: "14px 18px", marginBottom: 24, fontSize: 14, fontWeight: 600 }}>
+          Nenhuma linha real foi processada ainda. Verifique se a pasta do Google Drive está compartilhada com a credencial usada no n8n.
+        </div>
+      )}
+
       {/* KPI CARDS */}
       <div style={{
         display: "grid",
@@ -260,6 +281,28 @@ export default function DashboardGMV() {
         })}
       </div>
 
+      {/* FILTRO CRIADOR */}
+      <div style={{ marginBottom: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <input
+          value={criadorFiltro}
+          onChange={(event) => setCriadorFiltro(event.target.value)}
+          placeholder="Filtrar por @ do criador"
+          style={{
+            width: 280,
+            maxWidth: "100%",
+            border: "1px solid #d1d5db",
+            borderRadius: 8,
+            padding: "9px 12px",
+            fontSize: 14,
+            outline: "none",
+            background: "#fff",
+          }}
+        />
+        <span style={{ color: "#6b7280", fontSize: 13, fontWeight: 600 }}>
+          {linhasFiltradas.length} linhas visíveis
+        </span>
+      </div>
+
       {/* GRÁFICO */}
       <div style={{
         background: "#fff", border: "1px solid #e5e7eb",
@@ -288,6 +331,51 @@ export default function DashboardGMV() {
             ))}
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* DADOS DETALHADOS */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
+        <div style={{ padding: "18px 24px 12px", borderBottom: "1px solid #f3f4f6" }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#374151" }}>
+            Dados detalhados do Excel
+          </h2>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f9fafb" }}>
+                {colunas.map((coluna) => (
+                  <th key={coluna} style={{ padding: "10px 14px", textAlign: "left", color: "#6b7280", fontWeight: 700, whiteSpace: "nowrap" }}>
+                    {coluna}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {linhasFiltradas.slice(0, 300).map((linha, index) => (
+                <tr key={`${linha.arquivo_origem || "linha"}-${index}`} style={{ borderTop: "1px solid #f3f4f6" }}>
+                  {colunas.map((coluna) => (
+                    <td key={coluna} style={{ padding: "10px 14px", color: "#374151", whiteSpace: "nowrap", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {linha[coluna] == null || linha[coluna] === "" ? "—" : String(linha[coluna])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {!linhasFiltradas.length && (
+                <tr>
+                  <td colSpan={Math.max(colunas.length, 1)} style={{ padding: "18px 24px", color: "#9ca3af", textAlign: "center" }}>
+                    Nenhum dado detalhado disponível.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {linhasFiltradas.length > 300 && (
+          <div style={{ padding: "10px 24px", color: "#6b7280", fontSize: 12, borderTop: "1px solid #f3f4f6" }}>
+            Exibindo as primeiras 300 linhas para manter o dashboard rápido.
+          </div>
+        )}
       </div>
 
       {/* TABELA */}
