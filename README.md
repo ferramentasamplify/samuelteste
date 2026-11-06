@@ -2,6 +2,10 @@
 
 Código React + Vite do dashboard de aquisição, comissões individuais, gestão e projeções.
 
+Repositório: https://github.com/ferramentasamplify/sniper-aquisicao
+
+Arquivos de um antigo dashboard GMV por squads estão isolados em `legacy/dashboard-gmv/` e não fazem parte do Sniper atual.
+
 ## Online
 
 - Dashboard: https://funil-dashboard.72.60.147.19.sslip.io/#dashboard
