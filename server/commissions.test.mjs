@@ -1,0 +1,66 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
+import crypto from 'node:crypto';
+import { BRUNO, KEIZE, INITIAL_RULES } from './commission-model.mjs';
+
+test('management requires separate password and cannot change selections', async () => {
+  const previous = process.cwd();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'commission-management-test-'));
+  let server;
+  try {
+    process.chdir(dir);
+    fs.mkdirSync('.private'); fs.mkdirSync('public');
+    const auth = password => ({ salt: 'test-salt', hash: crypto.scryptSync(password, 'test-salt', 64).toString('hex') });
+    fs.writeFileSync('.private/auth.json', JSON.stringify(auth('individual-test')));
+    fs.writeFileSync('.private/management-auth.json', JSON.stringify(auth('management-test')));
+    fs.writeFileSync('.private/rules.json', JSON.stringify({ rows: INITIAL_RULES, fetchedAt: new Date().toISOString() }));
+    fs.writeFileSync('public/luiz-contatos.json', JSON.stringify({ creators: [{ id: 'test-lead', creatorId: 'Test', status: 'AGENCIADO', gmv: 100, responsibleIds: [BRUNO, KEIZE], editedDate: '2026-11-01' }], responsibles: [{ id: BRUNO, name: 'Bruno' }, { id: KEIZE, name: 'Keize' }], goals: { daily: [] } }));
+    const { commissionMiddleware } = await import(`./commissions.mjs?test=${Date.now()}`);
+    server = http.createServer((req, res) => commissionMiddleware(req, res, () => { res.statusCode = 404; res.end(); }));
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const base = `http://127.0.0.1:${server.address().port}/api/commissions`;
+    const login = (username, password) => fetch(`${base}/login`, { method: 'POST', body: JSON.stringify({ username, password }) });
+    assert.equal((await fetch(`${base}/report`)).status, 401);
+    assert.equal((await login('gestao', 'individual-test')).status, 401);
+    const response = await login('gestao', 'management-test');
+    assert.equal(response.status, 200);
+    const cookie = response.headers.get('set-cookie').split(';')[0];
+    const reportResponse = await fetch(`${base}/report?month=2026-11`, { headers: { cookie } });
+    assert.equal(reportResponse.status, 200);
+    const report = await reportResponse.json();
+    assert.equal(report.management, true);
+    assert.equal(report.members.length, 2);
+    assert.equal((await fetch(`${base}/selection`, { method: 'POST', headers: { cookie }, body: '{}' })).status, 403);
+    assert.equal(fs.existsSync('.private/selections.json'), false);
+    assert.equal((await fetch(`${base}/meta-selection`, { method: 'POST', headers: { cookie }, body: JSON.stringify({ month: '2026-11', leadId: 'x', included: false, reason: ' ' }) })).status, 400);
+    const changeMeta = included => fetch(`${base}/meta-selection`, { method: 'POST', headers: { cookie }, body: JSON.stringify({ month: '2026-11', leadId: 'test-lead', included, reason: included ? '' : 'Duplicado' }) });
+    const excluded = await changeMeta(false);
+    assert.equal(excluded.status, 200);
+    const excludedReport = await excluded.json();
+    assert.equal(excludedReport.leads[0].metaIncluded, false);
+    assert.equal(excludedReport.leads[0].exclusionReason, 'Duplicado');
+    assert.ok(excludedReport.members.every(member => Object.values(member.totals).every(part => part.gmv === 0)));
+    assert.ok(excludedReport.leads[0].commissions.every(item => !item.included));
+    const persisted = JSON.parse(fs.readFileSync('.private/selections.json', 'utf8'));
+    assert.equal(persisted['2026-11:team:test-lead'].history.length, 1);
+    assert.equal((await changeMeta(true)).status, 200);
+    const restored = JSON.parse(fs.readFileSync('.private/selections.json', 'utf8'));
+    assert.equal(restored['2026-11:team:test-lead'].included, true);
+    assert.equal(restored['2026-11:team:test-lead'].history.length, 2);
+    const individual = await login('brunozardo', 'individual-test');
+    const individualCookie = individual.headers.get('set-cookie').split(';')[0];
+    assert.equal((await fetch(`${base}/meta-selection`, { method: 'POST', headers: { cookie: individualCookie }, body: '{}' })).status, 403);
+    const own = await (await fetch(`${base}/report?month=2026-11&person=${KEIZE}`, { headers: { cookie: individualCookie } })).json();
+    assert.equal(own.person.id, BRUNO);
+    assert.equal(own.management, undefined);
+    assert.equal(own.creatorReturns, undefined);
+  } finally {
+    if (server) await new Promise(resolve => server.close(resolve));
+    process.chdir(previous);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

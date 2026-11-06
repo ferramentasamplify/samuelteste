@@ -1,5 +1,9 @@
 node_modules/
 dist/
+.private/
 .env
 .env.*
-.vercel/
+!.env.example
+.refresh-data.lock
+public/luiz-contatos.json
+*.log

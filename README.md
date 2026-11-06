@@ -1,56 +1,21 @@
-# Dashboard GMV · Squads Pro
+# Sniper — Dashboard e Comissões
 
-Dashboard V0 para visualização do GMV por squad de criadores de conteúdo.
-Construído em React + Vite.
+Código React + Vite do dashboard de aquisição, comissões individuais, gestão e projeções.
 
-## O que este projeto é
+## Online
 
-Este é o **layout funcional** do dashboard — a parte visual. Os dados
-exibidos são de exemplo. A integração com o banco de dados / API da
-empresa ainda precisa ser feita.
+- Dashboard: https://funil-dashboard.72.60.147.19.sslip.io/#dashboard
+- Comissões: https://funil-dashboard.72.60.147.19.sslip.io/#comissoes
 
-## Estrutura de arquivos
+O GitHub armazena o código. A aplicação roda na VPS; este repositório não configura deploy automático.
 
-```
-dashboard-gmv/
-├── index.html              → ponto de entrada HTML
-├── package.json            → dependências do projeto
-├── vite.config.js          → configuração do Vite
-└── src/
-    ├── main.jsx             → inicializa o React
-    ├── App.jsx               → componente raiz
-    ├── DashboardGMV.jsx      → o dashboard em si (toda a lógica está aqui)
-    └── index.css            → estilos base
-```
+## Executar
 
-## Como rodar localmente
+`npm ci`, `npm run dev`. Build: `npm run build`. Servidor: `npm run preview`.
+O plugin server/commissions.mjs atende a API, inclusive no preview; hospedagem puramente estática não substitui o servidor.
 
-```bash
-npm install
-npm run dev
-```
+## Dados e autenticação
 
-Abre em `http://localhost:5173`
+Provisionar com segurança public/luiz-contatos.json e a configuração de autenticação/estado em .private/. Não são versionados, assim como arquivos .env. Sem esses arquivos, a aplicação completa não terá dados nem login configurados.
 
-## Integração com dados reais
-
-O dashboard consome `GET /api/gmv-historico`.
-
-Esse endpoint lê a Data Table `gmv_relatorios` do n8n, que é alimentada
-pelos arquivos Excel da pasta Dashboard GMV no Google Drive.
-
-Variáveis necessárias no Vercel:
-
-```bash
-N8N_API_KEY=<api-key do n8n>
-N8N_BASE_URL=https://n8n.amplifyugc.co
-N8N_GMV_TABLE_ID=PUk4cvXS0H2TSsrZ
-```
-
-Se a API não responder, o dashboard mantém dados de exemplo como fallback.
-
-## Contato
-
-Construído por [área de Analytics] como base para o V0.
-Qualquer dúvida sobre a lógica de cálculo (taxas, totais), checar
-as funções `calcTaxa` e `totalGMV` no topo do componente.
+O atualizador aceita NOTION_TOKEN, OUTBOUND_NOTION_DATABASE_ID, OUTPUT_FILE e GOALS_CSV_URL. O script shell depende do n8n e caminhos da VPS atual. Relatórios aceitam SNIPER_CREATOR_MONTHLY_ROOT e SNIPER_CREATOR_DAILY_ROOT; seleções aceitam SNIPER_SELECTION_FILE.

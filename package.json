@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "refresh:data": "bash scripts/update-luiz-dashboard-data.sh",
     "build": "vite build",
     "preview": "vite preview"
   },
